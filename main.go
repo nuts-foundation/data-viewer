@@ -2,12 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/nuts-foundation/data-viewer/api/network"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -264,36 +264,16 @@ func renderDAG() {
 
 // fetchTransactionsInRange returns the transactions where start <= lamport clock < end
 func fetchTransactionsInRange(start int, end int) []string {
-	// Build the URL and place the start/end of the lamport clock range in the query string
-	url := fmt.Sprintf("http://127.0.0.1:1323/internal/network/v1/transaction?start=%d&end=%d", start, end)
-
-	// Call the API endpoint
-	response, err := http.Get(url)
-
-	// If there is a response with a body ensure it is deallocated later
-	if response != nil && response.Body != nil {
-		defer response.Body.Close()
-	}
-
-	// If an error occurred then report an error condition
-	if err != nil {
-		log.Panicf("HTTP request failed: %v", err)
-	}
-
-	// Read the response body contents, risking memory allocation issues
-	body, err := io.ReadAll(response.Body)
-
+	client, _ := network.NewClientWithResponses("http://127.0.0.1:1323")
+	transactions, err := client.ListTransactionsWithResponse(context.Background(), &network.ListTransactionsParams{
+		Start: &start,
+		End:   &end,
+	})
 	// Handle any errors that occurred in the response body reading
 	if err != nil {
-		log.Panicf("failed to read response body: %v", err)
+		log.Panicf("failed to call ListTransactions: %v", err)
 	}
-
-	// Parse the JSON from the body
-	var transactions []string
-	json.Unmarshal(body, &transactions)
-
-	// Return the transactions within the matching lambert clock range
-	return transactions
+	return *transactions.JSON200
 }
 
 func init() {
