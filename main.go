@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/nuts-foundation/data-viewer/analyzers"
+	networkAPI "github.com/nuts-foundation/nuts-node/network/api/v1"
+	vdrAPI "github.com/nuts-foundation/nuts-node/vdr/api/v1"
 	"io"
 	"log"
 	"net/http"
@@ -29,6 +33,37 @@ var vcursor int = 0
 var lastPressed string
 
 func main() {
+	if len(os.Args) >= 3 && os.Args[1] == "analyze" {
+		nodeAddress := os.Getenv("NUTS_NODE_ADDRESS")
+		if len(nodeAddress) == 0 {
+			log.Panic("NUTS_NODE_ADDRESS not set")
+		}
+		vdrClient, err := vdrAPI.NewClient(nodeAddress)
+		if err != nil {
+			log.Panic(err)
+		}
+		networkClient, err := networkAPI.NewClient(nodeAddress)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		switch os.Args[2] {
+		case "did-graph":
+			if len(os.Args) < 4 {
+				log.Panic("analyze did-graph requires a DID as argument")
+			}
+			output, err := analyzers.DIDDocumentGraphAnalyzer{
+				VDR:     vdrClient,
+				Network: networkClient,
+			}.Analyze(context.Background(), os.Args[3:])
+			if err != nil {
+				log.Panic(err)
+			}
+			fmt.Println(output)
+			os.Exit(0)
+		}
+	}
+
 	// Setup termui which provides primitives for terminal-based UI applications
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
